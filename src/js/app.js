@@ -114,7 +114,7 @@ function changeLayerType() {
                 'fill-extrusion-color': ['get', 'color'],
                 'fill-extrusion-height': ['get', 'height'],
                 'fill-extrusion-base': ['get', 'base_height'],
-                'fill-extrusion-opacity': 1
+                'fill-extrusion-opacity': 0.7
             },
             filter: ['==', ['get', 'level'], 1]
         });
@@ -130,7 +130,7 @@ function changeLayerType() {
                 'fill-extrusion-color': ['get', 'color'],
                 'fill-extrusion-height': ['get', 'height'],
                 'fill-extrusion-base': ['get', 'base_height'],
-                'fill-extrusion-opacity': 1
+                'fill-extrusion-opacity': 0.7
             },
             filter: ['==', ['get', 'level'], 2]
         });

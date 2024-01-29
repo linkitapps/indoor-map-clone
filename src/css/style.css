@@ -33,19 +33,22 @@ html, body, #map {
 
 .change-D {
     margin-top: 15px;
-    padding: 5px 10px;
+    padding: 10px 15px;
+    font-size: 16px;
     background-color: aliceblue;
     cursor: pointer;
+    width: 80px;
+    text-align: center;
 }
 
 .show-stage {
     padding: 10px 15px;
     background-color: aliceblue;
-
-    font-size: 20px;
+    width: 80px;
+    font-size: 16px;
     color: black;
     cursor: pointer;
-
+    text-align: center;
     transition: all .4s ease;
 }
 
@@ -58,6 +61,8 @@ html, body, #map {
 }
 
 .stage {
+    padding: 4px;
+    font-size: 14px;
     cursor: pointer;
 }
 

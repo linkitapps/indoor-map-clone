@@ -10,7 +10,7 @@ const map = (window.map = new maplibregl.Map({
         'sources': {
             'raster-tiles': {
                 'type': 'raster',
-                'tiles': ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                'tiles': ['https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png'],
                 'tileSize': 256,
                 'minzoom': 0,
                 'maxzoom': 19
@@ -32,7 +32,7 @@ const map = (window.map = new maplibregl.Map({
         ]
     },
     zoom: 19,
-    center: [71.428572161323359, 51.091671321981359],
+    center: [126.88892, 37.57460],
     pitch: 60,
     bearing: 0,
     antialias: true
@@ -54,7 +54,7 @@ map.on('load', () => {
     });
     map.addSource('im', {
         type: 'geojson',
-        data: './src/ext/2im_4326.geojson',
+        data: './src/ext/building.geojson',
         generateId: true
     });
 
@@ -70,7 +70,7 @@ map.on('load', () => {
             'fill-extrusion-color': ['get', 'color'],
             'fill-extrusion-height': ['get', 'height'],
             'fill-extrusion-base': ['get', 'base_height'],
-            'fill-extrusion-opacity': 1
+            'fill-extrusion-opacity': 0.7
         },
         filter: ['==', ['get', 'level'], 1]
     });
@@ -86,7 +86,7 @@ map.on('load', () => {
             'fill-extrusion-color': ['get', 'color'],
             'fill-extrusion-height': ['get', 'height'],
             'fill-extrusion-base': ['get', 'base_height'],
-            'fill-extrusion-opacity': 1
+            'fill-extrusion-opacity': 0.7
         },
         filter: ['==', ['get', 'level'], 2]
     });
@@ -102,8 +102,8 @@ map.on('click', 'room-extrusion', (e) => {
 
     // console.log(e.features[0].properties)
 
-    popup.setLngLat(e.lngLat).setHTML(`Комната: ${e.features[0].properties.name}<br>
-    Площадь: ${e.features[0].properties.area_sqm}<br>
+    popup.setLngLat(e.lngLat).setHTML(`명칭: ${e.features[0].properties.name}<br>
+    넓이: ${e.features[0].properties.area_sqm}㎡<br>
     <img class='photo-test' src='${e.features[0].properties.photo}'/>`).addTo(map)
 
 })
@@ -111,11 +111,30 @@ map.on('click', 'room-extrusion', (e) => {
 map.on('click', 'room-extrusion2', (e) => {
     map.getCanvas().style.cursor = 'pointer';
 
-    popup.setLngLat(e.lngLat).setHTML(`Комната: ${e.features[0].properties.name}<br>
-    Площадь: ${e.features[0].properties.area_sqm}<br>
+    popup.setLngLat(e.lngLat).setHTML(`명칭: ${e.features[0].properties.name}<br>
+    넓이: ${e.features[0].properties.area_sqm}㎡<br>
     <img class='photo-test' src='${e.features[0].properties.photo}'/>`).addTo(map)
     
 
 })
 
 
+
+
+
+
+// 71.428572161323359, 51.091671321981359
+// 126.88892, 37.57460
+// geojson.features.forEach(function(item) {
+//     if (typeof(item.geometry.coordinates[0]) === 'number') {
+//         item.geometry.coordinates = [item.geometry.coordinates[0] + 55.46034783867664, item.geometry.coordinates[1] -13.517071321981362];
+//     } else {
+//         item.geometry.coordinates.forEach(function(item2, i) {
+//             item2.forEach(function(item3, j) {
+//                 item3.forEach(function(item4, k) {
+//                     item.geometry.coordinates[i][j][k] = [item4[0] + 55.46034783867664, item4[1] -13.517071321981362];
+//                 });
+//             });
+//         });
+//     }
+// });

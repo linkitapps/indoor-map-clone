@@ -34,6 +34,7 @@ const map = (window.map = new maplibregl.Map({
     zoom: 19,
     center: [126.88892, 37.57460],
     pitch: 60,
+    maxPitch: 85,
     bearing: 0,
     antialias: true
 }));

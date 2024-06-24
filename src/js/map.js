@@ -92,28 +92,34 @@ map.on('load', () => {
         filter: ['==', ['get', 'level'], 2]
     });
 
-
-
     // 구 생성 시작
-    map.addLayer({
-        id: 'custom_layer',
-        type: 'custom',
-        onAdd: function(map, mbxContext){
-
-            tb = new Threebox(
-                map, 
-                mbxContext,
-                {defaultLights: true}
-            );
-
-        },
-        
-        render: function(gl, matrix){
-            // tb.update();
-        }
-    })
+    // Deck.gl 초기화
+    try {
+        const deckLayer = new deck.MapboxLayer({
+            id: 'scatterplot-layer',
+            type: deck.ScatterplotLayer,
+            data: [
+                {
+                    position: [126.889, 37.5745],
+                    size: 10 // 구의 크기 (미터 단위)
+                }
+            ],
+            getPosition: d => d.position,
+            getRadius: d => d.size,
+            getFillColor: [255, 0, 0, 180],
+            radiusScale: 10,
+            opacity: 0.8
+        });
+    
+        map.addLayer(deckLayer);
+    } catch (e) {
+        console.log(e);
+    }
     // 구 생성 끝
 })
+
+
+
 
 
 
@@ -140,7 +146,8 @@ const modelTransform = {
     /* Since our 3D model is in real world meters, a scale transform needs to be
     * applied since the CustomLayerInterface expects units in MercatorCoordinates.
     */
-    scale: modelAsMercatorCoordinate.meterInMercatorCoordinateUnits()
+    // scale: modelAsMercatorCoordinate.meterInMercatorCoordinateUnits()
+    scale: 16e-9
 };
 
 const THREE = window.THREE;

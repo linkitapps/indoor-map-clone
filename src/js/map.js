@@ -1,3 +1,7 @@
+// WebGL 컨텍스트 생성
+const canvas = document.createElement('canvas');
+const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+
 const map = (window.map = new maplibregl.Map({
     container: 'map',
     style:
@@ -36,7 +40,8 @@ const map = (window.map = new maplibregl.Map({
     pitch: 60,
     maxPitch: 85,
     bearing: 0,
-    antialias: true
+    antialias: true,
+    context: gl // WebGL 컨텍스트 설정
 }));
 
 const navControl = new maplibregl.NavigationControl({
@@ -93,30 +98,61 @@ map.on('load', () => {
     });
 
     // 구 생성 시작
-    // Deck.gl 초기화
-    try {
-        const deckLayer = new deck.MapboxLayer({
-            id: 'scatterplot-layer',
-            type: deck.ScatterplotLayer,
-            data: [
-                {
-                    position: [126.889, 37.5745],
-                    size: 10 // 구의 크기 (미터 단위)
-                }
-            ],
-            getPosition: d => d.position,
-            getRadius: d => d.size,
-            getFillColor: [255, 0, 0, 180],
-            radiusScale: 10,
-            opacity: 0.8
-        });
-    
-        map.addLayer(deckLayer);
-    } catch (e) {
-        console.log(e);
+    // 구 좌표 생성 함수
+    function createSphere(center, radius, segments) {
+        const [centerLng, centerLat] = center;
+        const vertices = [];
+
+        for (let i = 0; i <= segments; i++) {
+            const theta = (i / segments) * Math.PI; // 0에서 PI까지
+            const sinTheta = Math.sin(theta);
+            const cosTheta = Math.cos(theta);
+
+            for (let j = 0; j <= segments; j++) {
+                const phi = (j / segments) * 2 * Math.PI; // 0에서 2PI까지
+                const x = radius * cosTheta * Math.cos(phi);
+                const y = radius * cosTheta * Math.sin(phi);
+                const z = radius * sinTheta;
+
+                vertices.push({
+                    position: [centerLng + x / 100000, centerLat + y / 100000],
+                    radius: 100, // 각 원기둥의 반경
+                    height: z * 1000 // 각 원기둥의 높이
+                });
+            }
+        }
+
+        return vertices;
     }
+
+    // 구 데이터 생성
+    const sphereData = createSphere([126.889, 37.5745], 0.05, 16);
+
+    // Deck.gl 초기화
+    const deckLayer = new deck.MapboxLayer({
+        id: 'sphere-layer',
+        type: deck.ColumnLayer,
+        data: sphereData,
+        getPosition: d => d.position,
+        getRadius: d => d.radius,
+        getElevation: d => d.height,
+        getFillColor: [255, 0, 0, 180],
+        radiusScale: 1,
+        elevationScale: 1,
+        extruded: true
+    });
+
+    // map.addLayer(deckLayer);
     // 구 생성 끝
 })
+
+// 창 크기 조정 시 WebGL 컨텍스트와 렌더러 크기 조정
+window.addEventListener('resize', () => {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    gl.canvas.width = width;
+    gl.canvas.height = height;
+});
 
 
 
@@ -147,7 +183,7 @@ const modelTransform = {
     * applied since the CustomLayerInterface expects units in MercatorCoordinates.
     */
     // scale: modelAsMercatorCoordinate.meterInMercatorCoordinateUnits()
-    scale: 16e-9
+    scale: 6e-9
 };
 
 const THREE = window.THREE;

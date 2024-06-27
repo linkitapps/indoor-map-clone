@@ -69,3 +69,5 @@ html, body, #map {
 .not-active {
     display: none;
 }
+
+#threejs-canvas { position: absolute; top: 0; left: 0; pointer-events: none; }

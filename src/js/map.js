@@ -93,46 +93,101 @@ map.on('load', () => {
     });
 
     // 구 생성 시작
-    // 구 좌표 생성 함수
-    function createSphere(center, radius, segments) {
-        const [centerLng, centerLat] = center;
-        const vertices = [];
+    // 2. Three.js 초기화
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.domElement.id = 'threejs-canvas';
+    document.body.appendChild(renderer.domElement);
 
-        for (let i = 0; i <= segments; i++) {
-            const theta = (i / segments) * Math.PI; // 0에서 PI까지
-            const sinTheta = Math.sin(theta);
-            const cosTheta = Math.cos(theta);
-
-            for (let j = 0; j <= segments; j++) {
-                const phi = (j / segments) * 2 * Math.PI; // 0에서 2PI까지
-                const x = radius * cosTheta * Math.cos(phi);
-                const y = radius * cosTheta * Math.sin(phi);
-                const z = radius * sinTheta;
-
-                vertices.push({
-                    position: [centerLng + x / 100000, centerLat + y / 100000],
-                    radius: 100, // 각 원기둥의 반경
-                    height: z * 1000 // 각 원기둥의 높이
-                });
-            }
+    // 3. 3D 구 생성
+    const geometry = new THREE.SphereGeometry(0.1, 32, 32);
+    const vertexShader = `
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
+    `;
 
-        return vertices;
+    const fragmentShader = `
+        varying vec2 vUv;
+        uniform float opacity;
+        void main() {
+            vec3 color1 = vec3(0.0, 1.0, 1.0); // 상단의 밝은 파란색
+            vec3 color2 = vec3(0.0, 0.0, 0.5); // 하단의 어두운 파란색
+            float gradient = vUv.y;
+            vec3 color = mix(color2, color1, gradient);
+            gl_FragColor = vec4(color, opacity);
+        }
+    `;
+
+    // 쉐이더 재질 생성
+    const material = new THREE.ShaderMaterial({
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader,
+        transparent: true,
+        uniforms: {
+            opacity: { value: 0.3 } // 투명도 설정 (0.0 ~ 1.0)
+        },
+        side: THREE.DoubleSide
+    });
+    const sphere = new THREE.Mesh(geometry, material);
+    scene.add(sphere);
+
+    // 카메라 위치 설정
+    camera.position.set(0, 0, 2);
+
+    // 4. 애니메이션 루프
+    function animate() {
+        requestAnimationFrame(animate);
+        sphere.rotation.x += 0.01;
+        sphere.rotation.y += 0.01;
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    // 5. 구체 위치 업데이트 함수
+    const targetCoordinates = [126.889, 37.5745];
+    function updateSpherePosition() {
+        const center = map.getCenter();
+        const targetPosition = map.project(targetCoordinates);
+        const centerPosition = map.project([center.lng, center.lat]);
+        
+        // 좌표 변환을 통해 위치를 업데이트
+        const x = (targetPosition.x - centerPosition.x) / window.innerWidth * 2;
+        const y = -(targetPosition.y - centerPosition.y) / window.innerHeight * 2;
+
+        sphere.position.set(x, y, 0);
     }
 
-    // 구 데이터 생성
-    
+    // 초기 구체 위치 설정
+    updateSpherePosition();
+
+    // 6. 지도 이벤트에 따라 구체 위치 업데이트
+    map.on('move', updateSpherePosition);
+    map.on('zoom', updateSpherePosition);
+    map.on('resize', () => {
+        const width = map.getCanvas().clientWidth;
+        const height = map.getCanvas().clientHeight;
+        renderer.setSize(width, height);
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        updateSpherePosition();
+    });
+
+    // 렌더러 캔버스를 맨 뒤로 보내기
+    renderer.domElement.style.position = 'absolute';
+    renderer.domElement.style.top = 0;
+    renderer.domElement.style.pointerEvents = 'none';
+    document.body.appendChild(renderer.domElement);
     // 구 생성 끝
 })
-
-// 창 크기 조정 시 WebGL 컨텍스트와 렌더러 크기 조정
-window.addEventListener('resize', () => {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    gl.canvas.width = width;
-    gl.canvas.height = height;
-});
-
 
 
 
@@ -164,8 +219,6 @@ const modelTransform = {
     // scale: modelAsMercatorCoordinate.meterInMercatorCoordinateUnits()
     scale: 6e-9
 };
-
-const THREE = window.THREE;
 
 // configuration of the custom layer for a 3D model per the CustomLayerInterface
 const customLayer = {

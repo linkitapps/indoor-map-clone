@@ -1,7 +1,3 @@
-// WebGL 컨텍스트 생성
-const canvas = document.createElement('canvas');
-const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-
 const map = (window.map = new maplibregl.Map({
     container: 'map',
     style:
@@ -40,8 +36,7 @@ const map = (window.map = new maplibregl.Map({
     pitch: 60,
     maxPitch: 85,
     bearing: 0,
-    antialias: true,
-    context: gl // WebGL 컨텍스트 설정
+    antialias: true
 }));
 
 const navControl = new maplibregl.NavigationControl({
@@ -126,23 +121,7 @@ map.on('load', () => {
     }
 
     // 구 데이터 생성
-    const sphereData = createSphere([126.889, 37.5745], 0.05, 16);
-
-    // Deck.gl 초기화
-    const deckLayer = new deck.MapboxLayer({
-        id: 'sphere-layer',
-        type: deck.ColumnLayer,
-        data: sphereData,
-        getPosition: d => d.position,
-        getRadius: d => d.radius,
-        getElevation: d => d.height,
-        getFillColor: [255, 0, 0, 180],
-        radiusScale: 1,
-        elevationScale: 1,
-        extruded: true
-    });
-
-    // map.addLayer(deckLayer);
+    
     // 구 생성 끝
 })
 

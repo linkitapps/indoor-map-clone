@@ -39,6 +39,15 @@ const map = (window.map = new maplibregl.Map({
     antialias: true
 }));
 
+// eslint-disable-next-line no-undef
+const tb = (window.tb = new Threebox(
+    map,
+    map.getCanvas().getContext('webgl'),
+    {
+        defaultLights: true
+    }
+));
+
 const navControl = new maplibregl.NavigationControl({
     visualizePitch: true,
     showZoom: false,
@@ -100,170 +109,74 @@ map.on('load', () => {
 })
 
 function add3DModel() {
-    // 3D model 로드 시작
-    // parameters to ensure the model is georeferenced correctly on the map
-    const modelOrigin = [126.889, 37.5745];
-    const modelAltitude = 0;
-    const modelRotate = [Math.PI / 2, 0, 0];
-
-    const modelAsMercatorCoordinate = maplibregl.MercatorCoordinate.fromLngLat(
-        modelOrigin,
-        modelAltitude
-    );
-
-    // transformation parameters to position, rotate and scale the 3D model onto the map
-    const modelTransform = {
-        translateX: modelAsMercatorCoordinate.x,
-        translateY: modelAsMercatorCoordinate.y,
-        translateZ: modelAsMercatorCoordinate.z,
-        rotateX: modelRotate[0],
-        rotateY: modelRotate[1],
-        rotateZ: modelRotate[2],
-        /* Since our 3D model is in real world meters, a scale transform needs to be
-        * applied since the CustomLayerInterface expects units in MercatorCoordinates.
-        */
-        // scale: modelAsMercatorCoordinate.meterInMercatorCoordinateUnits()
-        scale: 6e-9
-    };
-
-    // configuration of the custom layer for a 3D model per the CustomLayerInterface
-    const customLayer = {
-        id: '3d-model',
+    map.addLayer({
+        id: 'custom-threebox-model',
         type: 'custom',
         renderingMode: '3d',
-        onAdd (map, gl) {
-            this.camera = new THREE.Camera();
-            this.scene = new THREE.Scene();
+        onAdd: function () {
+            // Creative Commons License attribution:  Metlife Building model by https://sketchfab.com/NanoRay
+            // https://sketchfab.com/3d-models/metlife-building-32d3a4a1810a4d64abb9547bb661f7f3
+            const scale = 0.5;
+            const options = {
+                obj: 'data/34M_17/34M_17.gltf',
+                type: 'gltf',
+                scale: { x: scale, y: scale, z: scale },
+                units: 'meters',
+                rotation: { x: 90, y: -90, z: 0 }
+            };
 
-            // create two three.js lights to illuminate the model
-            const directionalLight = new THREE.DirectionalLight(0xffffff);
-            directionalLight.position.set(0, -70, 100).normalize();
-            this.scene.add(directionalLight);
-
-            const directionalLight2 = new THREE.DirectionalLight(0xffffff);
-            directionalLight2.position.set(0, 70, 100).normalize();
-            this.scene.add(directionalLight2);
-
-            // use the three.js GLTF loader to add the 3D model to the three.js scene
-            const loader = new THREE.GLTFLoader();
-            loader.load(
-                'data/34M_17/34M_17.gltf',
-                (gltf) => {
-                    this.scene.add(gltf.scene);
-                }
-            );
-            this.map = map;
-
-            // use the MapLibre GL JS map canvas for three.js
-            this.renderer = new THREE.WebGLRenderer({
-                canvas: map.getCanvas(),
-                context: gl,
-                antialias: true
+            tb.loadObj(options, (model) => {
+                model.setCoords([126.889, 37.5745]);
+                model.setRotation({ x: 0, y: 0, z: 241 });
+                tb.add(model);
             });
-
-            this.renderer.autoClear = false;
         },
-        render (gl, matrix) {
-            const rotationX = new THREE.Matrix4().makeRotationAxis(
-                new THREE.Vector3(1, 0, 0),
-                modelTransform.rotateX
-            );
-            const rotationY = new THREE.Matrix4().makeRotationAxis(
-                new THREE.Vector3(0, 1, 0),
-                modelTransform.rotateY
-            );
-            const rotationZ = new THREE.Matrix4().makeRotationAxis(
-                new THREE.Vector3(0, 0, 1),
-                modelTransform.rotateZ
-            );
 
-            const m = new THREE.Matrix4().fromArray(matrix);
-            const l = new THREE.Matrix4()
-                .makeTranslation(
-                    modelTransform.translateX,
-                    modelTransform.translateY,
-                    modelTransform.translateZ
-                )
-                .scale(
-                    new THREE.Vector3(
-                        modelTransform.scale,
-                        -modelTransform.scale,
-                        modelTransform.scale
-                    )
-                )
-                .multiply(rotationX)
-                .multiply(rotationY)
-                .multiply(rotationZ);
-
-            this.camera.projectionMatrix = m.multiply(l);
-            this.renderer.resetState();
-            this.renderer.render(this.scene, this.camera);
-            this.map.triggerRepaint();
+        render: function () {
+            tb.update();
         }
-    };
-
-    map.addLayer(customLayer);
-    // 3D model 로드 끝
+    });
 }
 
 
 function add3DSphere() {
-    // Deck.gl 레이어 생성
-    const scatterplotLayer = new deck.ScatterplotLayer({
-        id: 'scatterplot',
-        data: [
-            { position: [126.889, 37.5745], radius: 1000 }
-        ],
-        getPosition: d => d.position,
-        getRadius: d => d.radius,
-        getColor: d => [255, 0, 0],
-        opacity: 0.8,
-        stroked: true,
-        filled: true,
-        radiusScale: 1,
-        radiusMinPixels: 1,
-        radiusMaxPixels: 100,
-        lineWidthMinPixels: 1
+    // Create a 3D sphere with radius 30 meters
+    const radius = 10; // 10 meters
+    const geometry = new THREE.SphereGeometry(radius, 64, 64); // Radius 30 meters, 64 width segments, 64 height segments
+    const material = new THREE.MeshStandardMaterial({ 
+        color: 0x0000ff, // Blue color
+        opacity: 0.5, // Set opacity to 50%
+        transparent: true, // Enable transparency
+        roughness: 0.5, // Roughness for material
+        metalness: 0.1 // Metalness for material
     });
+    const sphere = new THREE.Mesh(geometry, material);
 
-    // Deck.GL 초기화
-    const deckgl = new deck.Deck({
-        canvas: 'deck-canvas',
-        width: '100%',
-        height: '100%',
-        initialViewState: {
-            longitude: 126.889,
-            latitude: 37.5745,
-            zoom: 13,
-            pitch: 0,
-            bearing: 0
-        },
-        controller: true,
-        layers: [scatterplotLayer],
-        views: [new deck.MapView({ repeat: true })]
-    });
+    // Add lights to create gradients
+    const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight1.position.set(1, 1, 1).normalize();
+    tb.add(directionalLight1);
 
-    const deckCanvas = document.createElement('canvas');
-    deckCanvas.id = 'deck-canvas';
-    deckCanvas.style.position = 'absolute';
-    deckCanvas.style.top = 0;
-    deckCanvas.style.left = 0;
-    deckCanvas.style.width = '100%';
-    deckCanvas.style.height = '100%';
-    map.getCanvasContainer().appendChild(deckCanvas);
+    const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight2.position.set(-1, -1, -1).normalize();
+    tb.add(directionalLight2);
 
-    // Deck.GL과 MapLibre 동기화
-    map.on('move', () => {
-        const { lng, lat } = map.getCenter();
-        deckgl.setProps({
-            viewState: {
-                longitude: lng,
-                latitude: lat,
-                zoom: map.getZoom(),
-                bearing: map.getBearing(),
-                pitch: map.getPitch()
-            }
-        });
+    const ambientLight = new THREE.AmbientLight(0x404040); // soft white light
+    tb.add(ambientLight);
+
+    // Set the coordinates for the sphere
+    const sphereObject = tb.Object3D({ obj: sphere, units: 'meters' }).setCoords([126.889, 37.5745]);
+
+    // Add the sphere to the scene
+    tb.add(sphereObject);
+
+    map.addLayer({
+        id: 'custom-threebox-sphere',
+        type: 'custom',
+        renderingMode: '3d',
+        render: function () {
+            tb.update();
+        }
     });
 }
 

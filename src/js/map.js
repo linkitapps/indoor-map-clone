@@ -92,215 +92,180 @@ map.on('load', () => {
         filter: ['==', ['get', 'level'], 2]
     });
 
-    // 구 생성 시작
-    // 2. Three.js 초기화
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({
-        antialias: true,
-        alpha: true
-    });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.domElement.id = 'threejs-canvas';
-    document.body.appendChild(renderer.domElement);
+    // 3D 모델 로드
+    add3DModel();
 
-    // 3. 3D 구 생성
-    const geometry = new THREE.SphereGeometry(0.1, 32, 32);
-    const vertexShader = `
-        varying vec2 vUv;
-        void main() {
-            vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-    `;
-
-    const fragmentShader = `
-        varying vec2 vUv;
-        uniform float opacity;
-        void main() {
-            vec3 color1 = vec3(0.0, 1.0, 1.0); // 상단의 밝은 파란색
-            vec3 color2 = vec3(0.0, 0.0, 0.5); // 하단의 어두운 파란색
-            float gradient = vUv.y;
-            vec3 color = mix(color2, color1, gradient);
-            gl_FragColor = vec4(color, opacity);
-        }
-    `;
-
-    // 쉐이더 재질 생성
-    const material = new THREE.ShaderMaterial({
-        vertexShader: vertexShader,
-        fragmentShader: fragmentShader,
-        transparent: true,
-        uniforms: {
-            opacity: { value: 0.3 } // 투명도 설정 (0.0 ~ 1.0)
-        },
-        side: THREE.DoubleSide
-    });
-    const sphere = new THREE.Mesh(geometry, material);
-    scene.add(sphere);
-
-    // 카메라 위치 설정
-    camera.position.set(0, 0, 2);
-
-    // 4. 애니메이션 루프
-    function animate() {
-        requestAnimationFrame(animate);
-        sphere.rotation.x += 0.01;
-        sphere.rotation.y += 0.01;
-        renderer.render(scene, camera);
-    }
-    animate();
-
-    // 5. 구체 위치 업데이트 함수
-    const targetCoordinates = [126.889, 37.5745];
-    function updateSpherePosition() {
-        const center = map.getCenter();
-        const targetPosition = map.project(targetCoordinates);
-        const centerPosition = map.project([center.lng, center.lat]);
-        
-        // 좌표 변환을 통해 위치를 업데이트
-        const x = (targetPosition.x - centerPosition.x) / window.innerWidth * 2;
-        const y = -(targetPosition.y - centerPosition.y) / window.innerHeight * 2;
-
-        sphere.position.set(x, y, 0);
-    }
-
-    // 초기 구체 위치 설정
-    updateSpherePosition();
-
-    // 6. 지도 이벤트에 따라 구체 위치 업데이트
-    map.on('move', updateSpherePosition);
-    map.on('zoom', updateSpherePosition);
-    map.on('resize', () => {
-        const width = map.getCanvas().clientWidth;
-        const height = map.getCanvas().clientHeight;
-        renderer.setSize(width, height);
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-        updateSpherePosition();
-    });
-
-    // 렌더러 캔버스를 맨 뒤로 보내기
-    renderer.domElement.style.position = 'absolute';
-    renderer.domElement.style.top = 0;
-    renderer.domElement.style.pointerEvents = 'none';
-    document.body.appendChild(renderer.domElement);
-    // 구 생성 끝
+    // 3D 구 생성
+    add3DSphere();
 })
 
+function add3DModel() {
+    // 3D model 로드 시작
+    // parameters to ensure the model is georeferenced correctly on the map
+    const modelOrigin = [126.889, 37.5745];
+    const modelAltitude = 0;
+    const modelRotate = [Math.PI / 2, 0, 0];
 
+    const modelAsMercatorCoordinate = maplibregl.MercatorCoordinate.fromLngLat(
+        modelOrigin,
+        modelAltitude
+    );
 
+    // transformation parameters to position, rotate and scale the 3D model onto the map
+    const modelTransform = {
+        translateX: modelAsMercatorCoordinate.x,
+        translateY: modelAsMercatorCoordinate.y,
+        translateZ: modelAsMercatorCoordinate.z,
+        rotateX: modelRotate[0],
+        rotateY: modelRotate[1],
+        rotateZ: modelRotate[2],
+        /* Since our 3D model is in real world meters, a scale transform needs to be
+        * applied since the CustomLayerInterface expects units in MercatorCoordinates.
+        */
+        // scale: modelAsMercatorCoordinate.meterInMercatorCoordinateUnits()
+        scale: 6e-9
+    };
 
+    // configuration of the custom layer for a 3D model per the CustomLayerInterface
+    const customLayer = {
+        id: '3d-model',
+        type: 'custom',
+        renderingMode: '3d',
+        onAdd (map, gl) {
+            this.camera = new THREE.Camera();
+            this.scene = new THREE.Scene();
 
+            // create two three.js lights to illuminate the model
+            const directionalLight = new THREE.DirectionalLight(0xffffff);
+            directionalLight.position.set(0, -70, 100).normalize();
+            this.scene.add(directionalLight);
 
-// 3D model 로드 시작
-// parameters to ensure the model is georeferenced correctly on the map
-const modelOrigin = [126.889, 37.5745];
-const modelAltitude = 0;
-const modelRotate = [Math.PI / 2, 0, 0];
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff);
+            directionalLight2.position.set(0, 70, 100).normalize();
+            this.scene.add(directionalLight2);
 
-const modelAsMercatorCoordinate = maplibregl.MercatorCoordinate.fromLngLat(
-    modelOrigin,
-    modelAltitude
-);
+            // use the three.js GLTF loader to add the 3D model to the three.js scene
+            const loader = new THREE.GLTFLoader();
+            loader.load(
+                'data/34M_17/34M_17.gltf',
+                (gltf) => {
+                    this.scene.add(gltf.scene);
+                }
+            );
+            this.map = map;
 
-// transformation parameters to position, rotate and scale the 3D model onto the map
-const modelTransform = {
-    translateX: modelAsMercatorCoordinate.x,
-    translateY: modelAsMercatorCoordinate.y,
-    translateZ: modelAsMercatorCoordinate.z,
-    rotateX: modelRotate[0],
-    rotateY: modelRotate[1],
-    rotateZ: modelRotate[2],
-    /* Since our 3D model is in real world meters, a scale transform needs to be
-    * applied since the CustomLayerInterface expects units in MercatorCoordinates.
-    */
-    // scale: modelAsMercatorCoordinate.meterInMercatorCoordinateUnits()
-    scale: 6e-9
-};
+            // use the MapLibre GL JS map canvas for three.js
+            this.renderer = new THREE.WebGLRenderer({
+                canvas: map.getCanvas(),
+                context: gl,
+                antialias: true
+            });
 
-// configuration of the custom layer for a 3D model per the CustomLayerInterface
-const customLayer = {
-    id: '3d-model',
-    type: 'custom',
-    renderingMode: '3d',
-    onAdd (map, gl) {
-        this.camera = new THREE.Camera();
-        this.scene = new THREE.Scene();
+            this.renderer.autoClear = false;
+        },
+        render (gl, matrix) {
+            const rotationX = new THREE.Matrix4().makeRotationAxis(
+                new THREE.Vector3(1, 0, 0),
+                modelTransform.rotateX
+            );
+            const rotationY = new THREE.Matrix4().makeRotationAxis(
+                new THREE.Vector3(0, 1, 0),
+                modelTransform.rotateY
+            );
+            const rotationZ = new THREE.Matrix4().makeRotationAxis(
+                new THREE.Vector3(0, 0, 1),
+                modelTransform.rotateZ
+            );
 
-        // create two three.js lights to illuminate the model
-        const directionalLight = new THREE.DirectionalLight(0xffffff);
-        directionalLight.position.set(0, -70, 100).normalize();
-        this.scene.add(directionalLight);
-
-        const directionalLight2 = new THREE.DirectionalLight(0xffffff);
-        directionalLight2.position.set(0, 70, 100).normalize();
-        this.scene.add(directionalLight2);
-
-        // use the three.js GLTF loader to add the 3D model to the three.js scene
-        const loader = new THREE.GLTFLoader();
-        loader.load(
-            'data/34M_17/34M_17.gltf',
-            (gltf) => {
-                this.scene.add(gltf.scene);
-            }
-        );
-        this.map = map;
-
-        // use the MapLibre GL JS map canvas for three.js
-        this.renderer = new THREE.WebGLRenderer({
-            canvas: map.getCanvas(),
-            context: gl,
-            antialias: true
-        });
-
-        this.renderer.autoClear = false;
-    },
-    render (gl, matrix) {
-        const rotationX = new THREE.Matrix4().makeRotationAxis(
-            new THREE.Vector3(1, 0, 0),
-            modelTransform.rotateX
-        );
-        const rotationY = new THREE.Matrix4().makeRotationAxis(
-            new THREE.Vector3(0, 1, 0),
-            modelTransform.rotateY
-        );
-        const rotationZ = new THREE.Matrix4().makeRotationAxis(
-            new THREE.Vector3(0, 0, 1),
-            modelTransform.rotateZ
-        );
-
-        const m = new THREE.Matrix4().fromArray(matrix);
-        const l = new THREE.Matrix4()
-            .makeTranslation(
-                modelTransform.translateX,
-                modelTransform.translateY,
-                modelTransform.translateZ
-            )
-            .scale(
-                new THREE.Vector3(
-                    modelTransform.scale,
-                    -modelTransform.scale,
-                    modelTransform.scale
+            const m = new THREE.Matrix4().fromArray(matrix);
+            const l = new THREE.Matrix4()
+                .makeTranslation(
+                    modelTransform.translateX,
+                    modelTransform.translateY,
+                    modelTransform.translateZ
                 )
-            )
-            .multiply(rotationX)
-            .multiply(rotationY)
-            .multiply(rotationZ);
+                .scale(
+                    new THREE.Vector3(
+                        modelTransform.scale,
+                        -modelTransform.scale,
+                        modelTransform.scale
+                    )
+                )
+                .multiply(rotationX)
+                .multiply(rotationY)
+                .multiply(rotationZ);
 
-        this.camera.projectionMatrix = m.multiply(l);
-        this.renderer.resetState();
-        this.renderer.render(this.scene, this.camera);
-        this.map.triggerRepaint();
-    }
-};
+            this.camera.projectionMatrix = m.multiply(l);
+            this.renderer.resetState();
+            this.renderer.render(this.scene, this.camera);
+            this.map.triggerRepaint();
+        }
+    };
 
-map.on('style.load', () => {
     map.addLayer(customLayer);
-});
-// 3D model 로드 끝
+    // 3D model 로드 끝
+}
 
+
+function add3DSphere() {
+    // Deck.gl 레이어 생성
+    const scatterplotLayer = new deck.ScatterplotLayer({
+        id: 'scatterplot',
+        data: [
+            { position: [126.889, 37.5745], radius: 1000 }
+        ],
+        getPosition: d => d.position,
+        getRadius: d => d.radius,
+        getColor: d => [255, 0, 0],
+        opacity: 0.8,
+        stroked: true,
+        filled: true,
+        radiusScale: 1,
+        radiusMinPixels: 1,
+        radiusMaxPixels: 100,
+        lineWidthMinPixels: 1
+    });
+
+    // Deck.GL 초기화
+    const deckgl = new deck.Deck({
+        canvas: 'deck-canvas',
+        width: '100%',
+        height: '100%',
+        initialViewState: {
+            longitude: 126.889,
+            latitude: 37.5745,
+            zoom: 13,
+            pitch: 0,
+            bearing: 0
+        },
+        controller: true,
+        layers: [scatterplotLayer],
+        views: [new deck.MapView({ repeat: true })]
+    });
+
+    const deckCanvas = document.createElement('canvas');
+    deckCanvas.id = 'deck-canvas';
+    deckCanvas.style.position = 'absolute';
+    deckCanvas.style.top = 0;
+    deckCanvas.style.left = 0;
+    deckCanvas.style.width = '100%';
+    deckCanvas.style.height = '100%';
+    map.getCanvasContainer().appendChild(deckCanvas);
+
+    // Deck.GL과 MapLibre 동기화
+    map.on('move', () => {
+        const { lng, lat } = map.getCenter();
+        deckgl.setProps({
+            viewState: {
+                longitude: lng,
+                latitude: lat,
+                zoom: map.getZoom(),
+                bearing: map.getBearing(),
+                pitch: map.getPitch()
+            }
+        });
+    });
+}
 
 
 
